@@ -5,6 +5,7 @@
 #include <QtWidgets>
 #include <QtSql>
 #include <QFile>
+#include <QByteArray>
 
 class MainWindow : public QMainWindow
 {
@@ -21,6 +22,7 @@ class MainWindow : public QMainWindow
     QSqlQueryModel rightModel;
 
     QModelIndex currentLeftIndex;
+    QString currentFilterString;
 
     bool createDbConnection();
     void readFile(login& logData) const;
@@ -36,11 +38,14 @@ class MainWindow : public QMainWindow
     void getDocsFromTable();
 
     void setCurrentLeftIndex(const QModelIndex &current, const QModelIndex &previous);
+    void setCurrentFilterString(const QString& fltrstrng);
+    void setFiltering();
 
     void actButtons(const QModelIndex& index); // !!!!!!!!!!!!!!!
 
   signals:
     void activateButtons(bool flag); // !!!!!!!!!!!!!!!!!!!!!!!!!
+    void filteringPattern(const QString& fltrstrng);
 };
 
 #endif // MAINWINDOW_H

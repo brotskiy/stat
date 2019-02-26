@@ -3,26 +3,37 @@
 MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
 {
   QSplitter* splitter = new QSplitter(Qt::Horizontal, this);
-
   QWidget* blnklft = new QWidget;
   QWidget* blnkrght = new QWidget;
-
   splitter->addWidget(blnklft);
   splitter->addWidget(blnkrght);
 
   QVBoxLayout* rlyt = new QVBoxLayout;
   QVBoxLayout* llyt = new QVBoxLayout;
 
+  QGroupBox* fltrgrp = new QGroupBox("Фильтр по столбцам");
+  QHBoxLayout* fltrlyt = new QHBoxLayout;
   QLineEdit* fltrline = new QLineEdit;
-  QTableView* viewleft = new QTableView;
+  QPushButton* refreshBtn = new QPushButton("Обновить таблицу");
+  fltrlyt->addWidget(fltrline);
+  fltrlyt->addWidget(refreshBtn);
+  fltrgrp->setLayout(fltrlyt);
+
+  QGroupBox* btnsgrp = new QGroupBox;
+  QHBoxLayout* btnslyt = new QHBoxLayout;
   QPushButton* fromTable = new QPushButton("Скачать документы");
   QPushButton* intoTable = new QPushButton("Добавить документы");
   intoTable->setEnabled(false);
   fromTable->setEnabled(false);
+  btnslyt->addWidget(fromTable);
+  btnslyt->addWidget(intoTable);
+  btnsgrp->setLayout(btnslyt);
 
-  llyt->addWidget(fltrline);
-  llyt->addWidget(fromTable);
-  llyt->addWidget(intoTable);
+  QTableView* viewleft = new QTableView;
+  viewleft->setSortingEnabled(true);      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  llyt->addWidget(fltrgrp);
+  llyt->addWidget(btnsgrp);
   llyt->addWidget(viewleft);
   blnklft->setLayout(llyt);
 
@@ -32,10 +43,12 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
   blnkrght->setLayout(rlyt);
 
   QToolBar* toolBar = new QToolBar(this);
-  QComboBox* yearsBox = new QComboBox(toolBar);
+  QComboBox* yearsBox = new QComboBox;
+  QLabel* yearsLbl= new QLabel("  Выберите год:  ");
 
-  toolBar->setMovable(false);
+  toolBar->addWidget(yearsLbl);
   toolBar->addWidget(yearsBox);
+  toolBar->setMovable(false);
   yearsBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
 
   setCentralWidget(splitter);
@@ -57,32 +70,43 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
       viewleft->setModel(&leftProxyModel);
       viewright->setModel(&rightModel);
 
-      viewleft->setSelectionMode(QAbstractItemView::SingleSelection); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      viewleft->setSelectionMode(QAbstractItemView::SingleSelection);
       viewleft->setSelectionBehavior(QAbstractItemView::SelectRows);
 
-      viewright->setSelectionMode(QAbstractItemView::SingleSelection); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      viewright->setSelectionMode(QAbstractItemView::SingleSelection);
       viewright->setSelectionBehavior(QAbstractItemView::SelectRows);
-
-      //viewright->setSelectionMode(QAbstractItemView::NoSelection);
 
       connect(yearsBox, &QComboBox::currentTextChanged, this, &MainWindow::fillLeftModel);
       connect(viewleft, &QTableView::doubleClicked, this, &MainWindow::fillRightModel);
 
-      connect(viewleft, &QTableView::clicked, this, &MainWindow::actButtons);  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      connect(this, &MainWindow::activateButtons, intoTable, &QPushButton::setEnabled); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      connect(viewleft, &QTableView::clicked, this, &MainWindow::actButtons);
+      connect(this, &MainWindow::activateButtons, intoTable, &QPushButton::setEnabled);
       connect(this, &MainWindow::activateButtons, fromTable, &QPushButton::setEnabled);
 
-      connect(intoTable, &QPushButton::pressed, this, &MainWindow::putDocsIntoTable);  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      connect(intoTable, &QPushButton::pressed, this, &MainWindow::putDocsIntoTable);
       connect(fromTable, &QPushButton::pressed, this, &MainWindow::getDocsFromTable);
 
       connect(viewleft->selectionModel(), &QItemSelectionModel::currentChanged, this, &MainWindow::setCurrentLeftIndex); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-      connect(fltrline, &QLineEdit::textChanged, &leftProxyModel, &QSortFilterProxyModel::setFilterWildcard);  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     // connect(fltrline, &QLineEdit::textChanged, &leftProxyModel, &QSortFilterProxyModel::setFilterWildcard);  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      connect(fltrline, &QLineEdit::textChanged, this, &MainWindow::setCurrentFilterString);
+      connect(refreshBtn, &QPushButton::pressed, this, &MainWindow::setFiltering);
+      connect(this, &MainWindow::filteringPattern, &leftProxyModel, &QSortFilterProxyModel::setFilterWildcard);
 
       while (query.next())
         yearsBox->addItem(query.value("god").toString());  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     }
   }
+}
+
+void MainWindow::setCurrentFilterString(const QString& fltrstrng)
+{
+  currentFilterString = fltrstrng;
+}
+
+void MainWindow::setFiltering()
+{
+  emit this->filteringPattern(currentFilterString);
 }
 
 void MainWindow::actButtons(const QModelIndex& index)
@@ -111,7 +135,7 @@ void MainWindow::putDocsIntoTable()
 
       QSqlQuery query;
       bool successful = query.exec("IF (SELECT COUNT(okpo) FROM budget.dbo.[pred_image] WHERE okpo=" + okpo + ")>0 "
-                                   "BEGIN DELETE FROM budget.dbo.[pred_image] WHERE okpo=" + okpo + " END");             // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                                   "BEGIN DELETE FROM budget.dbo.[pred_image] WHERE okpo=" + okpo + " END;");             // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
       if (!successful)
       {
@@ -120,13 +144,34 @@ void MainWindow::putDocsIntoTable()
       }
       else
       {
-        successful = query.exec("INSERT INTO pred_image(okpo,document_org) SELECT " + okpo + ",BulkColumn from OpenRowSet"
-                                "( BULK N\"" + rarName + "\",Single_BLOB) as файл");                                        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        QFile rarFile(rarName);
 
-        if (!successful)
+        if (! rarFile.open(QIODevice::ReadOnly))
+          showError("Не удалось открыть выбранный файл.\nЕсли для выбранного ОКПО в базе уже хранились документы, то теперь они удалены.");
+        else
         {
-          QString errStr = query.lastError().text();
-          showError("Не удалось загрузить новый файл в базу.\nЕсли для выбранного ОКПО в базе уже хранились документы, то теперь они удалены.\n\n" + errStr);
+          QByteArray fileContent;
+          QDataStream stream(&rarFile);
+          stream >> fileContent;
+
+          if (stream.status() != QDataStream::Ok)
+            showError("Ошибка при чтении данных из файла. Документы не были загружены в базу.\nЕсли для выбранного ОКПО в базе уже хранились документы, то теперь они удалены.");
+          else
+          {
+            QSqlQuery tmpQuery;
+            tmpQuery.prepare("INSERT INTO budget.dbo.[pred_image] (okpo, document_org) VALUES (:okpostr, :filedata);");
+            tmpQuery.bindValue(":okpostr", okpo);
+            tmpQuery.bindValue(":filedata", fileContent);
+            successful = tmpQuery.exec();
+
+            if (!successful)
+            {
+              QString errStr = query.lastError().text();
+              showError("Не удалось загрузить новый файл в базу.\nЕсли для выбранного ОКПО в базе уже хранились документы, то теперь они удалены.\n\n" + errStr);
+            }
+          }
+
+          rarFile.close();
         }
       }
     }
@@ -139,7 +184,7 @@ void MainWindow::getDocsFromTable()
   const QString okpo = leftModel.data(okpoIndex).toString();
 
   QSqlQuery query;
-  bool successful = query.exec("SELECT DISTINCT okpo FROM budget.dbo.[pred_image] WHERE okpo=" + okpo + ";");  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  bool successful = query.exec("SELECT [okpo], [document_org] FROM budget.dbo.[pred_image] WHERE okpo=" + okpo + ";");  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   if (!successful)
   {
@@ -150,16 +195,14 @@ void MainWindow::getDocsFromTable()
   {
     bool notvisited = true;
 
-    while (query.next()) // из-за distinct будет выполнен либо 1 раз, либо не будет выполнен вообще, если для выбранного окпо в базе нету документов!
+    while (query.next() && notvisited) // из-за изменения notvisited будет выполнен либо 1 раз, либо не будет выполнен вообще, если для выбранного окпо в базе нету документов!
     {
       notvisited = false;
-
       const QString dirName = QFileDialog::getExistingDirectory(this, "Выберите директорию для сохранения архива", "", QFileDialog::ShowDirsOnly);
 
       if (dirName != "")
       {
         const QString rarName = dirName + "/" + okpo + ".rar";
-
         QFile rarFile(rarName);
 
         if (rarFile.exists())
@@ -170,31 +213,17 @@ void MainWindow::getDocsFromTable()
             return;
         }
 
-        successful = query.exec("SELECT DISTINCT document_org FROM budget.dbo.[pred_image] WHERE okpo=" + okpo + ";"); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-        if (!successful)
-        {
-          QString errStr = query.lastError().text();
-          showError("Не удалось извлечь документы для данного ОКПО из базы:\n\n" + errStr);
-        }
+        if (! rarFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+          showError("Не удалось открыть/создать файл с данным именем!");
         else
         {
-          if (! rarFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
-          {
-            showError("Не открыть/создать файл с данным именем!");
-          }
-          else
-          {
-            query.next(); // чтобы стать на первую и единственную строку запроса
+          QDataStream stream(&rarFile);
+          stream << query.value(1).toByteArray(); // можно попробовать writeRawData!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-            QDataStream stream(&rarFile);
-            stream << query.value(0).toByteArray(); // можно попробовать writeRawData!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+          if (stream.status() != QDataStream::Ok)
+            showError("Ошибка при записи данных из запроса в файл!\nСодержимое файла может быть повреждено!");
 
-            if (stream.status() != QDataStream::Ok)
-              showError("Ошибка при записи данных из запроса в файл!\nСодержимое файла может быть повреждено!");
-
-            rarFile.close();
-          }
+          rarFile.close();
         }
       }
     }
@@ -218,11 +247,11 @@ void MainWindow::fillLeftModel(const QString& curYear)
 
     emit activateButtons(false); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    leftModel.setQuery("SELECT DISTINCT CAST(t1.[okpo] AS VARCHAR) AS [ОКПО], t3.[name] AS [Наименование], CAST(t3.[okato] AS VARCHAR) AS [ОКАТО], t3.okved AS [ОКВЭД] "
+    leftModel.setQuery("SELECT DISTINCT CAST(t1.[okpo] AS VARCHAR) AS [ОКПО], CAST(t3.[name] AS VARCHAR) AS [Наименование], "
+                       "CAST(t3.[okato] AS VARCHAR) AS [ОКАТО], CAST(t3.[okved] AS VARCHAR) AS [ОКВЭД] "
                        "FROM [budget].[dbo].[pred_null] t1 "
                        "LEFT JOIN [gs_reg_u].dbo.[s_okpo_cur] t3 ON t1.okpo=t3.okpo "
-                       "WHERE god=" + curYear + " "                                                 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                       "ORDER BY [ОКПО];");
+                       "WHERE god=" + curYear + ";");                                                     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     if (leftModel.lastError().isValid())
     {
