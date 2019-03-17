@@ -37,15 +37,15 @@ class MainWindow : public QMainWindow
     void putDocsIntoTable();
     void getDocsFromTable();
 
-    void setCurrentLeftIndex(const QModelIndex &current, const QModelIndex &previous);
     void setCurrentFilterString(const QString& fltrstrng);
-    void setFiltering();
+    void setFilteringOnView();
 
-    void actButtons(const QModelIndex& index); // !!!!!!!!!!!!!!!
+    void activateButtonsAndCurIndex(const QModelIndex& index);
 
   signals:
-    void activateButtons(bool flag); // !!!!!!!!!!!!!!!!!!!!!!!!!
-    void filteringPattern(const QString& fltrstrng);
+    void activateButtons(bool flag);
+
+    void simpleStringAndTime(const QString& message, int time);
 };
 
 #endif // MAINWINDOW_H
