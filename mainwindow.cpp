@@ -104,7 +104,7 @@ MainWindow::MainWindow(QWidget *parent): QMainWindow(parent)
 
 void MainWindow::activateButtonsAndCurIndex(const QModelIndex& index)
 {
-  currentLeftIndex = index;
+  currentLeftIndex = QPersistentModelIndex(index);  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   QModelIndex okpoIndex = leftProxyModel.index(currentLeftIndex.row(), 0); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   const QString okpo = leftProxyModel.data(okpoIndex).toString();          // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -166,11 +166,9 @@ void MainWindow::putDocsIntoTable()
           showError("Не удалось открыть выбранный файл!\nЕсли для выбранного ОКПО в базе уже хранились документы, то теперь они удалены.");
         else
         {
-          QByteArray fileContent; // = rarFile.readAll(); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          QDataStream stream(&rarFile);
-          stream >> fileContent;
+          QByteArray fileContent = rarFile.readAll(); // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-          if (stream.status() != QDataStream::Ok)
+          if (fileContent.isEmpty())         // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             showError("Ошибка при чтении данных из файла! Документы не были загружены в базу.\nЕсли для выбранного ОКПО в базе уже хранились документы, то теперь они удалены.");
           else
           {
@@ -238,15 +236,13 @@ void MainWindow::getDocsFromTable()
           showError("Не удалось открыть/создать файл с данным именем!");
         else
         {
-          QDataStream stream(&rarFile);
-          stream << query.value(1).toByteArray();
-
+          const qint64 errorFlag = rarFile.write(query.value(1).toByteArray());  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           rarFile.close();
 
-          if (stream.status() != QDataStream::Ok)
-            showError("Ошибка при записи данных из запроса в файл!\nСодержимое файла может быть повреждено!");
+          if (errorFlag == -1)
+            showError("Ошибка при записи данных в файл!\nСодержимое файла может быть повреждено!");
           else
-             QMessageBox::information(nullptr, "Сообщение", "Файл был успешно сохранён.");
+            QMessageBox::information(nullptr, "Сообщение", "Файл был успешно сохранён.");
         }
       }
     }
@@ -267,9 +263,9 @@ void MainWindow::fillLeftModel(const QString& curYear)
 
     emit activateButtons(false);   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  /*  leftModel.setQuery("SELECT DISTINCT CAST(t1.[okpo] AS VARCHAR) AS [ОКПО] "
+/*    leftModel.setQuery("SELECT DISTINCT CAST(t1.[okpo] AS VARCHAR) AS [ОКПО] "
                            "FROM [budget].[dbo].[pred_null] t1 "
-                           "WHERE god=" + curYear + ";");                             */
+                           "WHERE god=" + curYear + ";");                                   */
 
     leftModel.setQuery("SELECT DISTINCT CAST(t1.[okpo] AS VARCHAR) AS [ОКПО], CAST(t3.[name] AS VARCHAR) AS [Наименование], "
                        "CAST(t3.[okato] AS VARCHAR) AS [ОКАТО], CAST(t3.[okved] AS VARCHAR) AS [ОКВЭД] "
@@ -291,9 +287,9 @@ void MainWindow::fillRightModel(const QModelIndex& curIndex)
   QString okpo = leftProxyModel.data(okpoIndex).toString();        // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
- /* rightModel.setQuery("SELECT DISTINCT [okud] AS [ОКУД], [god] AS [Год] "
+/*  rightModel.setQuery("SELECT DISTINCT [okud] AS [ОКУД], [god] AS [Год] "
                       "FROM [budget].[dbo].[pred_null] t1 "
-                      "WHERE t1.okpo=" + okpo + ";");                             */
+                      "WHERE t1.okpo=" + okpo + ";");                         */
 
 
   rightModel.setQuery("SELECT DISTINCT [okud] AS [ОКУД], [god] AS [Год], [Краткое наименование формы], [Периодичность] "

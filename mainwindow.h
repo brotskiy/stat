@@ -21,7 +21,9 @@ class MainWindow : public QMainWindow
     QSortFilterProxyModel leftProxyModel;
     QSqlQueryModel rightModel;
 
-    QModelIndex currentLeftIndex;
+//    QModelIndex currentLeftIndex;
+
+    QPersistentModelIndex currentLeftIndex;  // !!!!!!!!!!!!!!!!!!!!!!!!!!
     QString currentFilterString;
 
     bool createDbConnection();
